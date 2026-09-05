@@ -11,6 +11,14 @@ set PORTABLE_CMD_CALLED=1
 :: Prevent output from clearing when entering venv
 chcp 65001 > NUL
 
+:: nkf: https://github.com/kkato233/nkf/releases
+set PATH=%~dp0bin;%PATH%
+:: use to opencode.json
+set OPENCODE_ROOT=%~dp0
+set OPENCODE_ROOT=%OPENCODE_ROOT:\=/%
+set PYTHONUTF8=1
+set SHELL=bash.exe
+
 ::###################################################################################
 :: feature settings
 ::###################################################################################
@@ -27,6 +35,8 @@ if "%ENABLE_NODEJS%"      equ "" set ENABLE_NODEJS=0
 if "%ENABLE_GO%"          equ "" set ENABLE_GO=0
 if "%ENABLE_BUN%"         equ "" set ENABLE_BUN=0
 if "%ENABLE_SVN%"         equ "" set ENABLE_SVN=0
+if "%ENABLE_OPENCODE%"    equ "" set ENABLE_OPENCODE=0
+if "%ENABLE_GRAFANA%"     equ "" set ENABLE_GRAFANA=0
 
 :: If even one Windows hard link is in use,
 :: you cannot delete any of the hard links that share the same original file.
@@ -45,6 +55,17 @@ if "%PORTABLE_PYTHON_REQUIREMENT_MODULES_DEFAULT%" equ "" set PORTABLE_PYTHON_RE
 ::if "%PORTABLE_NODEJS_REQUIREMENT_MODULES%" equ "" set PORTABLE_NODEJS_REQUIREMENT_MODULES=
 ::if "%PORTABLE_BUN_REQUIREMENT_MODULES%" equ "" set PORTABLE_BUN_REQUIREMENT_MODULES=
 
+if "%ENABLE_OPENCODE%" equ "1" (
+    set ENABLE_NODEJS=1
+    set PORTABLE_NODEJS_REQUIREMENT_MODULES=-g opencode-ai
+)
+
+if "%ENABLE_GRAFANA%" equ "1" (
+    if "%ENABLE_LOKI%"  equ "" set ENABLE_LOKI=1
+    if "%ENABLE_PROMETHEUS%"  equ "" set ENABLE_PROMETHEUS=0
+    if "%ENABLE_ALLOY%"  equ "" set ENABLE_ALLOY=1
+)
+
 ::###################################################################################
 :: workspace settings
 ::###################################################################################
@@ -53,7 +74,7 @@ if "%CUR_DIR%" equ "" set CUR_DIR=%~dp0
 :: Search parent folders for the workspace folder
 if "%SEARCH_PARENT_WORKSPACE%" equ "" set SEARCH_PARENT_WORKSPACE=0
 if "%BASE_DIR_NAME%"        equ "" (for %%A in ("%CUR_DIR%.") do set BASE_DIR_NAME=%%~nA)
-if "%WORKSPACE_NAME%"       equ "" set WORKSPACE_NAME=workspace
+if "%WORKSPACE_NAME%"       equ "" set WORKSPACE_NAME=.portable
 set WORKSPACE_ROOT_DEFAULT=%CUR_DIR%%WORKSPACE_NAME%
 if "%WORKSPACE_ROOT%"       equ "" set WORKSPACE_ROOT=%WORKSPACE_ROOT_DEFAULT%
 :: Use this shorter path if %WORKSPACE_ROOT% is too long and causes build failures
@@ -75,13 +96,17 @@ if "%PORTABLE_PYTHON_URL%"     equ "" set PORTABLE_PYTHON_URL=https://www.python
 if "%PORTABLE_PYTHON_PIP_URL%" equ "" set PORTABLE_PYTHON_PIP_URL=https://bootstrap.pypa.io/get-pip.py
 if "%CUDA_URL%"                equ "" set CUDA_URL=https://developer.download.nvidia.com/compute/cuda/12.6.2/local_installers/cuda_12.6.2_560.94_windows.exe
 if "%VULKAN_URL%"              equ "" set VULKAN_URL=https://sdk.lunarg.com/sdk/download/1.3.296.0/windows/VulkanSDK-1.3.296.0-Installer.exe
-if "%PORTABLE_CHROME_URL%"     equ "" set PORTABLE_CHROME_URL=https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/win64/chrome-win64.zip
-if "%PORTABLE_CHROME_DRIVER_URL%" equ "" set PORTABLE_CHROME_DRIVER_URL=https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/win64/chromedriver-win64.zip
+if "%PORTABLE_CHROME_URL%"     equ "" set PORTABLE_CHROME_URL=https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/win64/chrome-win64.zip
+if "%PORTABLE_CHROME_DRIVER_URL%" equ "" set PORTABLE_CHROME_DRIVER_URL=https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/win64/chromedriver-win64.zip
 if "%PORTABLE_FFMPEG_URL%"     equ "" set PORTABLE_FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
 if "%PORTABLE_NODEJS_URL%"     equ "" set PORTABLE_NODEJS_URL=https://nodejs.org/download/release/v22.19.0/node-v22.19.0-win-x64.zip
 if "%PORTABLE_GO_URL%"         equ "" set PORTABLE_GO_URL=https://go.dev/dl/go1.25.1.windows-amd64.zip
 if "%PORTABLE_BUN_URL%"        equ "" set PORTABLE_BUN_URL=https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64.zip
 if "%PORTABLE_SVN_URL%"        equ "" set PORTABLE_SVN_URL=https://www.visualsvn.com/files/Apache-Subversion-1.14.5-3.zip
+if "%PORTABLE_GRAFANA_URL%"    equ "" set PORTABLE_GRAFANA_URL=https://dl.grafana.com/grafana/release/13.1.0/grafana_13.1.0_28013217238_windows_amd64.tar.gz
+if "%PORTABLE_LOKI_URL%"       equ "" set PORTABLE_LOKI_URL=https://github.com/grafana/loki/releases/download/v3.7.3/loki-windows-amd64.exe.zip
+if "%PORTABLE_PROMETHEUS_URL%" equ "" set PORTABLE_PROMETHEUS_URL=https://github.com/prometheus/prometheus/releases/download/v3.12.0/prometheus-3.12.0.windows-amd64.zip
+if "%PORTABLE_ALLOY_URL%"      equ "" set PORTABLE_ALLOY_URL=https://github.com/grafana/alloy/releases/download/v1.17.0/alloy-windows-amd64.exe.zip
 
 ::###################################################################################
 :: etc settings
@@ -179,20 +204,42 @@ if "%ENABLE_SVN%" equ "1" (
     if ERRORLEVEL 1 goto :ERROR
 )
 
+if "%ENABLE_GRAFANA%" equ "1" (
+    call :ACTIVATE_GRAFANA
+    if ERRORLEVEL 1 goto :ERROR
+)
+
+if "%ENABLE_LOKI%" equ "1" (
+    call :ACTIVATE_LOKI
+    if ERRORLEVEL 1 goto :ERROR
+)
+
+if "%ENABLE_PROMETHEUS%" equ "1" (
+    call :ACTIVATE_PROMETHEUS
+    if ERRORLEVEL 1 goto :ERROR
+)
+
+if "%ENABLE_ALLOY%" equ "1" (
+    call :ACTIVATE_ALLOY
+    if ERRORLEVEL 1 goto :ERROR
+)
+
 echo.
 goto :SUCCESS
 :ERROR
-    echo ################################
+    echo #################################
     echo #   portable-cmd launch error   #
-    echo ################################
+    echo #################################
     pause
 exit /b 1
 
 :SUCCESS
-    echo ##################################
-    echo #   portable-cmd launch success   #
-    echo ##################################
-    echo.
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo ###################################
+        echo #   portable-cmd launch success   #
+        echo ###################################
+        echo.
+    )
     
     :: Switch to interactive mode if the script is called directly
     :: (Check if this batch filename is included in the startup command)
@@ -225,9 +272,11 @@ exit /b 0
     :L_WHERE_EXE_0
 
     :: output exe path and version
-    echo %EXE_CMD% used is located at "%FIRST_LINE%"
-    if "%VER_OPTION%" neq "" (
-        %*
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo %EXE_CMD% used is located at "%FIRST_LINE%"
+        if "%VER_OPTION%" neq "" (
+            %*
+        )
     )
 exit /b 0
 
@@ -354,8 +403,10 @@ exit /b 1
 ::###################################################################################
 
 :ACTIVATE_GIT
-    echo;
-    echo ##### checking installed git...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed git...
+    )
     for %%A in ("%PORTABLE_GIT_URL:/=" "%") do set "PORTABLE_GIT_FILENAME=%%~nxA"
     set PORTABLE_GIT_DL=%LIB_DIR%\%PORTABLE_GIT_FILENAME%
     set PORTABLE_GIT_ROOT=%LIB_DIR%\git
@@ -414,8 +465,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_CMAKE
-    echo;
-    echo ##### checking installed cmake...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed cmake...
+    )
     for %%A in ("%PORTABLE_CMAKE_URL:/=" "%") do set "PORTABLE_CMAKE_FILENAME=%%~nxA"
     set PORTABLE_CMAKE_DL=%LIB_DIR%\%PORTABLE_CMAKE_FILENAME%
     set PORTABLE_CMAKE_ROOT=%LIB_DIR%\cmake
@@ -482,8 +535,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_UV
-    echo;
-    echo ##### checking installed uv...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed uv...
+    )
     for %%A in ("%PORTABLE_UV_URL:/=" "%") do set "PORTABLE_UV_FILENAME=%%~nxA"
     set PORTABLE_UV_DL=%LIB_DIR%\%PORTABLE_UV_FILENAME%
     set PORTABLE_UV_ROOT=%LIB_DIR%\uv
@@ -508,24 +563,28 @@ exit /b 0
     )
 
     :: initialize uv project
-    if not exist "pyproject.toml" (
+    if not exist "%CUR_DIR%pyproject.toml" (
         :: Create .venv and pyproject.toml
-        uv init --bare --python %PORTABLE_UV_PY_VER%
+        uv init --bare --python %PORTABLE_UV_PY_VER% --directory %CUR_DIR%
         if ERRORLEVEL 1 exit /b 1
 
         :: Create .python-version. (Fix python version)
-        uv python pin %PORTABLE_UV_PY_VER%
+        uv python pin %PORTABLE_UV_PY_VER% --directory %CUR_DIR%
         if ERRORLEVEL 1 exit /b 1
     )
     
     :: update modules
-    if exist "pyproject.toml" (
-        uv sync
+    if exist "%CUR_DIR%pyproject.toml" (
+        if "%PORTABLE_CMD_SILENT%" neq "1" (
+            uv sync --directory %CUR_DIR%
+        ) else (
+            uv sync --directory %CUR_DIR% >nul 2>&1
+        )
     )
 
     :: activate venv
-    if exist ".venv\Scripts\activate.bat" (
-        call ".venv\Scripts\activate.bat"
+    if exist "%CUR_DIR%.venv\Scripts\activate.bat" (
+        call "%CUR_DIR%.venv\Scripts\activate.bat"
         if ERRORLEVEL 1 exit /b 1
     )
     
@@ -565,8 +624,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_PYTHON
-    echo;
-    echo ##### checking installed python...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed python...
+    )
     for %%A in ("%PORTABLE_PYTHON_URL:/=" "%") do set "PORTABLE_PYTHON_FILENAME=%%~nxA"
     set PORTABLE_PYTHON_DL=%LIB_DIR%\%PORTABLE_PYTHON_FILENAME%
     set PORTABLE_PYTHON_ROOT=%LIB_DIR%\python
@@ -743,8 +804,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_CUDA
-    echo;
-    echo ##### checking installed CUDA Toolkit...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed CUDA Toolkit...
+    )
     for %%A in ("%CUDA_URL:/=" "%") do set "CUDA_FILENAME=%%~nxA"
     set CUDA_DL=%LIB_DIR%\%CUDA_FILENAME%
 
@@ -816,8 +879,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_VULKAN
-    echo;
-    echo ##### checking installed Vulkan SDK...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed Vulkan SDK...
+    )
     for %%A in ("%VULKAN_URL:/=" "%") do set "VULKAN_FILENAME=%%~nxA"
     set VULKAN_DL=%LIB_DIR%\%VULKAN_FILENAME%
 
@@ -891,8 +956,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_CHROME
-    echo;
-    echo ##### checking installed chrome...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed chrome...
+    )
     for %%A in ("%PORTABLE_CHROME_URL:/=" "%") do set "PORTABLE_CHROME_FILENAME=%%~nxA"
     set PORTABLE_CHROME_DL=%LIB_DIR%\%PORTABLE_CHROME_FILENAME%
     set PORTABLE_CHROME_ROOT=%LIB_DIR%\chrome
@@ -955,8 +1022,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_CHROME_DRIVER
-    echo;
-    echo ##### checking installed chrome driver...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed chrome driver...
+    )
     for %%A in ("%PORTABLE_CHROME_DRIVER_URL:/=" "%") do set "PORTABLE_CHROME_DRIVER_FILENAME=%%~nxA"
     set PORTABLE_CHROME_DRIVER_DL=%LIB_DIR%\%PORTABLE_CHROME_DRIVER_FILENAME%
     set PORTABLE_CHROME_DRIVER_ROOT=%LIB_DIR%\chrome_driver
@@ -1019,8 +1088,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_FFMPEG
-    echo;
-    echo ##### checking installed ffmpeg...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed ffmpeg...
+    )
     for %%A in ("%PORTABLE_FFMPEG_URL:/=" "%") do set "PORTABLE_FFMPEG_FILENAME=%%~nxA"
     set PORTABLE_FFMPEG_DL=%LIB_DIR%\%PORTABLE_FFMPEG_FILENAME%
     set PORTABLE_FFMPEG_ROOT=%LIB_DIR%\ffmpeg
@@ -1083,8 +1154,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_NODEJS
-    echo;
-    echo ##### checking installed nodejs...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed nodejs...
+    )
     for %%A in ("%PORTABLE_NODEJS_URL:/=" "%") do set "PORTABLE_NODEJS_FILENAME=%%~nxA"
     set PORTABLE_NODEJS_DL=%LIB_DIR%\%PORTABLE_NODEJS_FILENAME%
     set PORTABLE_NODEJS_ROOT=%LIB_DIR%\nodejs
@@ -1168,8 +1241,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_GO
-    echo;
-    echo ##### checking installed go...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed go...
+    )
     for %%A in ("%PORTABLE_GO_URL:/=" "%") do set "PORTABLE_GO_FILENAME=%%~nxA"
     set PORTABLE_GO_DL=%LIB_DIR%\%PORTABLE_GO_FILENAME%
     set PORTABLE_GO_ROOT=%LIB_DIR%\go
@@ -1225,8 +1300,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_BUN
-    echo;
-    echo ##### checking installed bun...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed bun...
+    )
     for %%A in ("%PORTABLE_BUN_URL:/=" "%") do set "PORTABLE_BUN_FILENAME=%%~nxA"
     set PORTABLE_BUN_DL=%LIB_DIR%\%PORTABLE_BUN_FILENAME%
     set PORTABLE_BUN_ROOT=%LIB_DIR%\bun
@@ -1325,8 +1402,10 @@ exit /b 0
 ::###################################################################################
 
 :ACTIVATE_SVN
-    echo;
-    echo ##### checking installed svn...
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed svn...
+    )
     for %%A in ("%PORTABLE_SVN_URL:/=" "%") do set "PORTABLE_SVN_FILENAME=%%~nxA"
     set PORTABLE_SVN_DL=%LIB_DIR%\%PORTABLE_SVN_FILENAME%
     set PORTABLE_SVN_ROOT=%LIB_DIR%\svn
@@ -1375,5 +1454,261 @@ exit /b 0
     )
     
     echo ##### svn installed
+exit /b 0
+
+::###################################################################################
+:: grafana
+::###################################################################################
+
+:ACTIVATE_GRAFANA
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed grafana...
+    )
+    for %%A in ("%PORTABLE_GRAFANA_URL:/=" "%") do set "PORTABLE_GRAFANA_FILENAME=%%~nxA"
+    set PORTABLE_GRAFANA_DL=%LIB_DIR%\%PORTABLE_GRAFANA_FILENAME%
+    set PORTABLE_GRAFANA_ROOT=%LIB_DIR%\grafana
+
+    :: check already installed portable grafana
+    if not exist "%PORTABLE_GRAFANA_ROOT%\bin\grafana.exe" (
+        echo grafana is not installed
+
+        :: install portable grafana
+        call :INSTALL_GRAFANA
+        if ERRORLEVEL 1 exit /b 1
+    )
+    :: append portable grafana path
+    set "PATH=%PORTABLE_GRAFANA_ROOT%\bin;%PATH%"
+
+    :: output grafana path and version
+    call :WHERE_EXE grafana.exe -v
+    if ERRORLEVEL 1 exit /b 1
+    
+    set ACTIVE_GRAFANA=1
+exit /b 0
+
+:INSTALL_GRAFANA
+    echo ##### downloading portable grafana...
+    curl -L %PORTABLE_GRAFANA_URL% -o "%PORTABLE_GRAFANA_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_GRAFANA_URL% download failed
+        exit /b 1
+    )
+    echo ##### installing portable grafana...
+    :: extract tar.gz
+    tar -xzf "%PORTABLE_GRAFANA_DL%" -C "%LIB_DIR%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_GRAFANA_DL% extract failed
+        exit /b 1
+    )
+
+    :: delete dl file
+	del "%PORTABLE_GRAFANA_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_GRAFANA_DL% delete failed
+        exit /b 1
+    )
+
+    :: find extracted grafana directory (folder name differs from zip file name)
+    for /d %%D in ("%LIB_DIR%\grafana-*") do (
+        ren "%%D" "grafana"
+        goto :L_INSTALL_GRAFANA_RENAMED
+    )
+    echo %LIB_DIR%\grafana-* rename failed
+    exit /b 1
+    :L_INSTALL_GRAFANA_RENAMED
+    echo ##### grafana installed
+exit /b 0
+
+::###################################################################################
+:: loki
+::###################################################################################
+
+:ACTIVATE_LOKI
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed loki...
+    )
+    for %%A in ("%PORTABLE_LOKI_URL:/=" "%") do set "PORTABLE_LOKI_FILENAME=%%~nxA"
+    set PORTABLE_LOKI_DL=%LIB_DIR%\%PORTABLE_LOKI_FILENAME%
+    set PORTABLE_LOKI_ROOT=%LIB_DIR%\loki
+
+    :: check already installed portable loki
+    if not exist "%PORTABLE_LOKI_ROOT%\loki-windows-amd64.exe" (
+        echo loki is not installed
+
+        :: install portable loki
+        call :INSTALL_LOKI
+        if ERRORLEVEL 1 exit /b 1
+    )
+    :: append portable loki path
+    set "PATH=%PORTABLE_LOKI_ROOT%;%PATH%"
+
+    :: output loki path and version
+    call :WHERE_EXE loki-windows-amd64.exe --version
+    if ERRORLEVEL 1 exit /b 1
+    
+    set ACTIVE_LOKI=1
+exit /b 0
+
+:INSTALL_LOKI
+    echo ##### downloading portable loki...
+    curl -L %PORTABLE_LOKI_URL% -o "%PORTABLE_LOKI_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_LOKI_URL% download failed
+        exit /b 1
+    )
+    echo ##### installing portable loki...
+    :: unzip (archive contains a single executable at root)
+    powershell -Command "Expand-Archive -Path '%PORTABLE_LOKI_DL%' -DestinationPath '%LIB_DIR%'"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_LOKI_DL% unzip failed
+        exit /b 1
+    )
+
+    :: delete dl file
+	del "%PORTABLE_LOKI_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_LOKI_DL% delete failed
+        exit /b 1
+    )
+
+    :: move executable into loki root directory
+    if not exist "%PORTABLE_LOKI_ROOT%\" mkdir "%PORTABLE_LOKI_ROOT%"
+    move "%LIB_DIR%\loki-windows-amd64.exe" "%PORTABLE_LOKI_ROOT%\"
+    if ERRORLEVEL 1 (
+        echo %LIB_DIR%\loki-windows-amd64.exe move failed
+        exit /b 1
+    )
+    echo ##### loki installed
+exit /b 0
+
+::###################################################################################
+:: prometheus
+::###################################################################################
+
+:ACTIVATE_PROMETHEUS
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed prometheus...
+    )
+    for %%A in ("%PORTABLE_PROMETHEUS_URL:/=" "%") do set "PORTABLE_PROMETHEUS_FILENAME=%%~nxA"
+    set PORTABLE_PROMETHEUS_DL=%LIB_DIR%\%PORTABLE_PROMETHEUS_FILENAME%
+    set PORTABLE_PROMETHEUS_ROOT=%LIB_DIR%\prometheus
+
+    :: check already installed portable prometheus
+    if not exist "%PORTABLE_PROMETHEUS_ROOT%\prometheus.exe" (
+        echo prometheus is not installed
+
+        :: install portable prometheus
+        call :INSTALL_PROMETHEUS
+        if ERRORLEVEL 1 exit /b 1
+    )
+    :: append portable prometheus path
+    set "PATH=%PORTABLE_PROMETHEUS_ROOT%;%PATH%"
+
+    :: output prometheus path and version
+    call :WHERE_EXE prometheus.exe --version
+    if ERRORLEVEL 1 exit /b 1
+    
+    set ACTIVE_PROMETHEUS=1
+exit /b 0
+
+:INSTALL_PROMETHEUS
+    echo ##### downloading portable prometheus...
+    curl -L %PORTABLE_PROMETHEUS_URL% -o "%PORTABLE_PROMETHEUS_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_PROMETHEUS_URL% download failed
+        exit /b 1
+    )
+    echo ##### installing portable prometheus...
+    :: unzip
+    powershell -Command "Expand-Archive -Path '%PORTABLE_PROMETHEUS_DL%' -DestinationPath '%LIB_DIR%'"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_PROMETHEUS_DL% unzip failed
+        exit /b 1
+    )
+
+    :: delete dl file
+	del "%PORTABLE_PROMETHEUS_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_PROMETHEUS_DL% delete failed
+        exit /b 1
+    )
+
+    :: Extract folder name from full path
+    for %%A in ("%PORTABLE_PROMETHEUS_DL:/=" "%") do set "_DL_NAME=%%~nA"
+    for %%A in ("%PORTABLE_PROMETHEUS_ROOT:\=" "%") do set "_NAME=%%~nA"
+    
+    :: rename
+    ren "%LIB_DIR%\%_DL_NAME%" "%_NAME%"
+    if ERRORLEVEL 1 (
+        echo %LIB_DIR%\%_DL_NAME% rename failed
+        exit /b 1
+    )
+    echo ##### prometheus installed
+exit /b 0
+
+::###################################################################################
+:: alloy (promtail の後継。syslog 受信 -^> Loki push)
+::###################################################################################
+
+:ACTIVATE_ALLOY
+    if "%PORTABLE_CMD_SILENT%" neq "1" (
+        echo;
+        echo ##### checking installed alloy...
+    )
+    for %%A in ("%PORTABLE_ALLOY_URL:/=" "%") do set "PORTABLE_ALLOY_FILENAME=%%~nxA"
+    set PORTABLE_ALLOY_DL=%LIB_DIR%\%PORTABLE_ALLOY_FILENAME%
+    set PORTABLE_ALLOY_ROOT=%LIB_DIR%\alloy
+
+    :: check already installed portable alloy
+    if not exist "%PORTABLE_ALLOY_ROOT%\alloy-windows-amd64.exe" (
+        echo alloy is not installed
+
+        :: install portable alloy
+        call :INSTALL_ALLOY
+        if ERRORLEVEL 1 exit /b 1
+    )
+    :: append portable alloy path
+    set "PATH=%PORTABLE_ALLOY_ROOT%;%PATH%"
+
+    :: output alloy path and version
+    call :WHERE_EXE alloy-windows-amd64.exe --version
+    if ERRORLEVEL 1 exit /b 1
+
+    set ACTIVE_ALLOY=1
+exit /b 0
+
+:INSTALL_ALLOY
+    echo ##### downloading portable alloy...
+    curl -L %PORTABLE_ALLOY_URL% -o "%PORTABLE_ALLOY_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_ALLOY_URL% download failed
+        exit /b 1
+    )
+    echo ##### installing portable alloy...
+    :: unzip (archive contains a single executable at root)
+    powershell -Command "Expand-Archive -Path '%PORTABLE_ALLOY_DL%' -DestinationPath '%LIB_DIR%'"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_ALLOY_DL% unzip failed
+        exit /b 1
+    )
+
+    :: delete dl file
+	del "%PORTABLE_ALLOY_DL%"
+    if ERRORLEVEL 1 (
+        echo %PORTABLE_ALLOY_DL% delete failed
+        exit /b 1
+    )
+
+    :: move executable into alloy root directory
+    if not exist "%PORTABLE_ALLOY_ROOT%\" mkdir "%PORTABLE_ALLOY_ROOT%"
+    move "%LIB_DIR%\alloy-windows-amd64.exe" "%PORTABLE_ALLOY_ROOT%\"
+    if ERRORLEVEL 1 (
+        echo %LIB_DIR%\alloy-windows-amd64.exe move failed
+        exit /b 1
+    )
+    echo ##### alloy installed
 exit /b 0
 

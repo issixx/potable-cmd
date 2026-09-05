@@ -1,5 +1,4 @@
-# workspace directory
-workspace/
+.portable/
 .python-version
 pyproject.toml
 uv.lock

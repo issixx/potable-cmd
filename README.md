@@ -2,8 +2,10 @@
 
 ## Overview
 `portable-cmd.bat` is a batch file for Windows that launches a command prompt ready to use various tools simply by double-clicking it.
-If the tools are not already installed, it automatically downloads portable versions of development tools (Git, CMake, and Python) into the workspace folder located directly under the batch file, extracts them, and sets their paths.
+If the tools are not already installed, it automatically downloads portable versions of development tools into the `.portable` folder located directly under the batch file, extracts them, and sets their paths.
 This allows you to start a command prompt for a specific environment just by running that project's portable-cmd.bat, without having to think about any setup steps.
+
+By default, **Git** and **uv** are enabled. Python is managed by uv (`uv add` with `pyproject.toml`). Do not use `pip`. Running `portable-cmd.bat` calls `uv sync`.
 
 
 ## How to Run
@@ -17,59 +19,79 @@ or Download & Execute
 powershell -NoProfile -Command "$f='portable-cmd.bat'; (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/issixx/portable-cmd/main/portable-cmd.bat') -replace \"`r?`n\",\"`r`n\" | Set-Content $f -Encoding ASCII; cmd /k $f"
 ```
 
-After execution, the paths for the installed portable versions will be configured.
+After execution, the paths for the installed portable versions will be configured. If uv is enabled, `uv sync` is also run.
 
 ## Portable Tools
-- **Git**:
-- **CMake**:
-- **Python**: Embedded version with `pip`, `virtualenv`, and `requirements.txt` installation
-- **Python venv**: Virtual environment creation and auto-activation with `venv`/`virtualenv`
-- **Chrome**, **ChromeDriver**:
-- **FFmpeg**:
-- **Node.js**:
-- **Go**:
-- **Svn**:
+Enabled by default:
+
+- **Git** (`ENABLE_GIT=1`)
+- **uv** (`ENABLE_UV=1`): Portable `uv` and Python (default `3.12.9`). Packages are managed with `uv add` (`pyproject.toml`, `.venv`, `.python-version`). Do not use `pip`. Running `portable-cmd.bat` calls `uv sync`
+
+Optional:
+
+- **CMake** (`ENABLE_CMAKE=1`)
+- **Chrome**, **ChromeDriver** (`ENABLE_CHROME=1`)
+- **FFmpeg** (`ENABLE_FFMPEG=1`)
+- **Node.js** (`ENABLE_NODEJS=1`)
+- **Go** (`ENABLE_GO=1`)
+- **Bun** (`ENABLE_BUN=1`)
+- **Svn** (`ENABLE_SVN=1`)
+- **OpenCode** (`ENABLE_OPENCODE=1`): Enables Node.js and installs `opencode-ai` globally
+- **Grafana** (`ENABLE_GRAFANA=1`): Also enables **Loki** and **Alloy** by default. **Prometheus** is off unless `ENABLE_PROMETHEUS=1`
 
 ## System Installation SDKs
-- **CUDA Toolkit**: Downloads installer and installs after user confirmation (interactive)
-- **Vulkan SDK**: Downloads installer and installs after user confirmation (interactive)  
+- **CUDA Toolkit** (`ENABLE_CUDA=1`): Downloads installer and installs after user confirmation (interactive)
+- **Vulkan SDK** (`ENABLE_VULKAN=1`): Downloads installer and installs after user confirmation (interactive)
 
 ## Directory Structure (Auto-created on execution)
 ```
 <root>
 │
-├─ workspace          ← Default workspace directory
+├─ .portable          ← Default portable tools directory
 │   └─ lib            ← Portable binaries for each tool are stored here
 │       ├─ git
+│       ├─ uv
 │       ├─ cmake
-│       ├─ python
 │       ├─ chrome
+│       ├─ chrome_driver
 │       ├─ ffmpeg
 │       ├─ nodejs
 │       ├─ go
-│       └─ svn
-└─ requirements.txt  ← (Optional) Python package list
+│       ├─ bun
+│       ├─ svn
+│       ├─ grafana
+│       ├─ loki
+│       ├─ prometheus
+│       └─ alloy
+├─ .venv              ← Created by uv
+├─ pyproject.toml     ← Created by uv if missing
+├─ .python-version    ← Pinned by uv
+└─ uv.lock
 ```
-- `workspace` is created under the execution directory (`%~dp0`).
-- If the current directory path is already too long, it will automatically switch to `%USERPROFILE%\<base directory name>\workspace`.
+- `.portable` is created under the execution directory (`%~dp0`).
+- If the current directory path is already too long, it will automatically switch to `%USERPROFILE%\<base directory name>\.portable`.
+- Only directories for enabled tools are created under `.portable\lib`.
 
 ## Installation Tool Configuration
 
-- By default, only Git and Python are installed.
+- By default, only Git and uv are enabled.
 - To install other tools, either modify the settings directly or create a wrapper batch file like the following.
 
 my-portable-cmd.bat
 ```bash
 :: portable tools
 set ENABLE_GIT=1
-set ENABLE_CMAKE=1
 set ENABLE_UV=1
-set ENABLE_PYTHON=1
+set ENABLE_CMAKE=1
 set ENABLE_CHROME=1
 set ENABLE_FFMPEG=1
 set ENABLE_NODEJS=1
 set ENABLE_GO=1
+set ENABLE_BUN=1
 set ENABLE_SVN=1
+set ENABLE_OPENCODE=1
+set ENABLE_GRAFANA=1
+set ENABLE_PROMETHEUS=1
 
 :: sdks
 set ENABLE_CUDA=1
@@ -101,18 +123,20 @@ exit /b 1
 
 ```bash
 set PORTABLE_GIT_URL=https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/PortableGit-2.47.0.2-64-bit.7z.exe
-set PORTABLE_CMAKE_URL=https://github.com/Kitware/CMake/releases/download/v3.30.5/cmake-3.30.5-windows-x86_64.zip
 set PORTABLE_CMAKE_URL=https://github.com/Kitware/CMake/releases/download/v3.28.6/cmake-3.28.6-windows-x86_64.zip
-set PORTABLE_PYTHON_URL=https://www.python.org/ftp/python/3.13.0/python-3.13.0-embed-amd64.zip
-set PORTABLE_PYTHON_URL=https://www.python.org/ftp/python/3.12.9/python-3.12.9-embed-amd64.zip
-set PORTABLE_PYTHON_PIP_URL=https://bootstrap.pypa.io/get-pip.py
-set PORTABLE_PYTHON_REQUIREMENT_MODULES=blinker==1.7.0 selenium-wire==5.1.0 selenium==4.23.1 requests setuptools packaging
-set PORTABLE_CHROME_URL=https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/win64/chrome-win64.zip
-set PORTABLE_CHROME_DRIVER_URL=https://storage.googleapis.com/chrome-for-testing-public/138.0.7204.168/win64/chromedriver-win64.zip
+set PORTABLE_UV_URL=https://github.com/astral-sh/uv/releases/download/0.10.7/uv-x86_64-pc-windows-msvc.zip
+set PORTABLE_UV_PY_VER=3.12.9
+set PORTABLE_CHROME_URL=https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/win64/chrome-win64.zip
+set PORTABLE_CHROME_DRIVER_URL=https://storage.googleapis.com/chrome-for-testing-public/151.0.7922.47/win64/chromedriver-win64.zip
 set PORTABLE_FFMPEG_URL=https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-master-latest-win64-gpl.zip
 set PORTABLE_NODEJS_URL=https://nodejs.org/download/release/v22.19.0/node-v22.19.0-win-x64.zip
 set PORTABLE_GO_URL=https://go.dev/dl/go1.25.1.windows-amd64.zip
+set PORTABLE_BUN_URL=https://github.com/oven-sh/bun/releases/latest/download/bun-windows-x64.zip
 set PORTABLE_SVN_URL=https://www.visualsvn.com/files/Apache-Subversion-1.14.5-3.zip
+set PORTABLE_GRAFANA_URL=https://dl.grafana.com/grafana/release/13.1.0/grafana_13.1.0_28013217238_windows_amd64.tar.gz
+set PORTABLE_LOKI_URL=https://github.com/grafana/loki/releases/download/v3.7.3/loki-windows-amd64.exe.zip
+set PORTABLE_PROMETHEUS_URL=https://github.com/prometheus/prometheus/releases/download/v3.12.0/prometheus-3.12.0.windows-amd64.zip
+set PORTABLE_ALLOY_URL=https://github.com/grafana/alloy/releases/download/v1.17.0/alloy-windows-amd64.exe.zip
 
 set CUDA_URL=https://developer.download.nvidia.com/compute/cuda/12.6.2/local_installers/cuda_12.6.2_560.94_windows.exe
 set VULKAN_URL=https://sdk.lunarg.com/sdk/download/1.3.296.0/windows/VulkanSDK-1.3.296.0-Installer.exe
@@ -127,15 +151,11 @@ portable-cmd.bat
 code .\
 ```
 
-- To install Python modules:
-  - Install using `python -m pip install <module>`.
-- To create a venv environment with portable Python:
-  - Run `python -m virtualenv <venv-name>`
+- Python is managed by uv. Add packages with `uv add <package>`. Do not use `pip`.
+- Running `portable-cmd.bat` calls `uv sync` and activates `.venv`.
 
 - To use system tools:
   - Set `set USE_SYSTEM_EXE=1` to use already installed tools that are in the PATH.
-- To use system Python with venv:
-  - Additionally set `set ENABLE_PYTHON_VENV=1` to use system Python while installing dependency modules with venv.
 
 ## License
 
