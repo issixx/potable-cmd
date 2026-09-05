@@ -67,18 +67,18 @@ if "%ENABLE_GRAFANA%" equ "1" (
 )
 
 ::###################################################################################
-:: workspace settings
+:: portable directory settings
 ::###################################################################################
 if "%CUR_DIR%" equ "" set CUR_DIR=%~dp0
 
-:: Search parent folders for the workspace folder
-if "%SEARCH_PARENT_WORKSPACE%" equ "" set SEARCH_PARENT_WORKSPACE=0
+:: Search parent folders for the portable directory
+if "%SEARCH_PARENT_PORTABLE%" equ "" set SEARCH_PARENT_PORTABLE=0
 if "%BASE_DIR_NAME%"        equ "" (for %%A in ("%CUR_DIR%.") do set BASE_DIR_NAME=%%~nA)
-if "%WORKSPACE_NAME%"       equ "" set WORKSPACE_NAME=.portable
-set WORKSPACE_ROOT_DEFAULT=%CUR_DIR%%WORKSPACE_NAME%
-if "%WORKSPACE_ROOT%"       equ "" set WORKSPACE_ROOT=%WORKSPACE_ROOT_DEFAULT%
-:: Use this shorter path if %WORKSPACE_ROOT% is too long and causes build failures
-if "%WORKSPACE_SHORT_ROOT%" equ "" set WORKSPACE_SHORT_ROOT=%USERPROFILE%\%BASE_DIR_NAME%\%WORKSPACE_NAME%
+if "%PORTABLE_NAME%"        equ "" set PORTABLE_NAME=.portable
+set PORTABLE_ROOT_DEFAULT=%CUR_DIR%%PORTABLE_NAME%
+if "%PORTABLE_ROOT%"        equ "" set PORTABLE_ROOT=%PORTABLE_ROOT_DEFAULT%
+:: Use this shorter path if %PORTABLE_ROOT% is too long and causes build failures
+if "%PORTABLE_SHORT_ROOT%"  equ "" set PORTABLE_SHORT_ROOT=%USERPROFILE%\%BASE_DIR_NAME%\%PORTABLE_NAME%
 if "%LIB_DIR_NAME%"         equ "" set LIB_DIR_NAME=lib
 if "%PYTHON_VENV_DIR_NAME%" equ "" set PYTHON_VENV_DIR_NAME=.venv
 
@@ -125,18 +125,18 @@ if "%USE_SYSTEM_EXE%" equ "1" (
 )
 
 ::###################################################################################
-:: check path length and deside workspace path
+:: check path length and decide portable path
 ::###################################################################################
 
 :: Check if the current directory path is too long to avoid build failure
-:: and decide the workspace path
-call :DESIDE_WORKSPACE_ROOT_LEN
+:: and decide the portable path
+call :DECIDE_PORTABLE_ROOT_LEN
 if ERRORLEVEL 1 goto :ERROR
 
 ::###################################################################################
 :: main
 ::###################################################################################
-set LIB_DIR=%WORKSPACE_ROOT%\%LIB_DIR_NAME%
+set LIB_DIR=%PORTABLE_ROOT%\%LIB_DIR_NAME%
 
 :: make lib directory
 if not exist "%LIB_DIR%\" ( mkdir "%LIB_DIR%" )
@@ -322,16 +322,15 @@ exit /b 0
     ( endlocal & set "%~2=%_count%" )
 exit /b 0
 
-:: Find the parent directory of the workspace
-:FIND_PARENT_DIR_WORKSPACE
+:: Walk up from CUR_DIR until a directory named %PORTABLE_NAME% is found.
+:FIND_PARENT_DIR_PORTABLE
     set "%~1="
-    
-    :: Traverse parent directories to find %WORKSPACE_NAME%
+
     set "SEARCH_DIR=%CUR_DIR%"
-    :FIND_WORKSPACE
-    
-    if exist "%SEARCH_DIR%%WORKSPACE_NAME%\" (
-        set "%~1=%SEARCH_DIR%%WORKSPACE_NAME%"
+    :FIND_PORTABLE
+
+    if exist "%SEARCH_DIR%%PORTABLE_NAME%\" (
+        set "%~1=%SEARCH_DIR%%PORTABLE_NAME%"
         exit /b 0
     )
     set "PARENT_DIR=%SEARCH_DIR:~0,-1%"
@@ -339,59 +338,59 @@ exit /b 0
 
     for %%A in ("%PARENT_DIR%") do set "SEARCH_DIR=%%~dpA"
     if "%SEARCH_DIR%" equ "" exit /b 1
-    goto :FIND_WORKSPACE
+    goto :FIND_PORTABLE
 exit /b 1
 
-:: Check if the current directory path is too long to avoid build failure
-:: and decide the workspace path
-:DESIDE_WORKSPACE_ROOT_LEN
+:: Prefer an existing short path, then a parent portable dir, then fail if still too long.
+:DECIDE_PORTABLE_ROOT_LEN
 
-    :: Use the shorter path if it already exists
-    if "%WORKSPACE_SHORT_ROOT%" neq "" (
-        if exist "%WORKSPACE_SHORT_ROOT%" (
-            set WORKSPACE_ROOT=%WORKSPACE_SHORT_ROOT%
+    :: Reuse the shorter path if it was created on a previous run
+    if "%PORTABLE_SHORT_ROOT%" neq "" (
+        if exist "%PORTABLE_SHORT_ROOT%" (
+            set PORTABLE_ROOT=%PORTABLE_SHORT_ROOT%
         )
     )
 
-    :: if the workspace path is not set, use the default path
-    if "%SEARCH_PARENT_WORKSPACE%" equ "1" (
-        if "%WORKSPACE_ROOT%" equ "%WORKSPACE_ROOT_DEFAULT%" (
-            call :FIND_PARENT_DIR_WORKSPACE WORKSPACE_ROOT_TEMP
+    :: Only search parents when the caller left PORTABLE_ROOT at its default
+    if "%SEARCH_PARENT_PORTABLE%" equ "1" (
+        if "%PORTABLE_ROOT%" equ "%PORTABLE_ROOT_DEFAULT%" (
+            call :FIND_PARENT_DIR_PORTABLE PORTABLE_ROOT_TEMP
         )
     )
-    if "%WORKSPACE_ROOT_TEMP%" neq "" (
-        set WORKSPACE_ROOT=%WORKSPACE_ROOT_TEMP%
-        echo Found workspace path: %WORKSPACE_ROOT_TEMP%
+    if "%PORTABLE_ROOT_TEMP%" neq "" (
+        set PORTABLE_ROOT=%PORTABLE_ROOT_TEMP%
+        echo Found portable path: %PORTABLE_ROOT_TEMP%
+        set PORTABLE_ROOT_TEMP=
     )
 
-    :: Check if the current directory path is too long
-    call :STRLEN "%WORKSPACE_ROOT%" CUR_DIR_LEN
+    :: Reject paths that exceed the safe length for tool/build usage
+    call :STRLEN "%PORTABLE_ROOT%" CUR_DIR_LEN
     if %CUR_DIR_LEN% LEQ %CUR_DIR_LEN_MAX% (
         :: ok
         exit /b 0
     )
     :: failure
-    echo #Error# The current directory path ["%WORKSPACE_ROOT%"] is too long! [Now:%CUR_DIR_LEN%, Max:%CUR_DIR_LEN_MAX%]
+    echo #Error# The current directory path ["%PORTABLE_ROOT%"] is too long! [Now:%CUR_DIR_LEN%, Max:%CUR_DIR_LEN_MAX%]
 
     ::######################
     :: Use shorter path
     ::######################
 
-    if "%WORKSPACE_SHORT_ROOT%" equ "%WORKSPACE_ROOT%" (
+    if "%PORTABLE_SHORT_ROOT%" equ "%PORTABLE_ROOT%" (
         echo Please move to a shorter path.
         echo Long file names may not only cause %BASE_DIR_NAME% build failures but also lead to internal failures in UE5's Generate Solution, resulting in unusable .sln files.
         exit /b 1
     )
 
-    :: ask to create a workspace in the shorter path
-    echo Do you want to create a workspace in "%WORKSPACE_SHORT_ROOT%"?
+    :: Offer the profile-local fallback when the project path itself is too long
+    echo Do you want to create a portable directory in "%PORTABLE_SHORT_ROOT%"?
     set /p INPUT=[y/n]:
     if /I "%INPUT%" neq "y" (
         exit /b 1
     )
 
-    set WORKSPACE_ROOT=%WORKSPACE_SHORT_ROOT%
-    call :STRLEN "%WORKSPACE_ROOT%" CUR_DIR_LEN
+    set PORTABLE_ROOT=%PORTABLE_SHORT_ROOT%
+    call :STRLEN "%PORTABLE_ROOT%" CUR_DIR_LEN
     if %CUR_DIR_LEN% LEQ %CUR_DIR_LEN_MAX% (
         :: ok
         exit /b 0
@@ -632,7 +631,6 @@ exit /b 0
     set PORTABLE_PYTHON_DL=%LIB_DIR%\%PORTABLE_PYTHON_FILENAME%
     set PORTABLE_PYTHON_ROOT=%LIB_DIR%\python
     set PORTABLE_PYTHON_CMD=%PORTABLE_PYTHON_ROOT%\python.exe
-    ::set VENV_DIR=%WORKSPACE_ROOT%\%PYTHON_VENV_DIR_NAME%
     set VENV_DIR=%CUR_DIR%%PYTHON_VENV_DIR_NAME%
 
     :: find system python

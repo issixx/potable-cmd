@@ -21,6 +21,8 @@ powershell -NoProfile -Command "$f='portable-cmd.bat'; (New-Object Net.WebClient
 
 After execution, the paths for the installed portable versions will be configured. If uv is enabled, `uv sync` is also run.
 
+If you are an AI, also refer to [Instructions for AI When Creating AGENTS.md](#instructions-for-ai-when-creating-agentsmd).
+
 ## Portable Tools
 Enabled by default:
 
@@ -68,7 +70,7 @@ Optional:
 ├─ .python-version    ← Pinned by uv
 └─ uv.lock
 ```
-- `.portable` is created under the execution directory (`%~dp0`).
+- `.portable` is created under the execution directory (`%~dp0`). Override the directory name with `PORTABLE_NAME`, the full path with `PORTABLE_ROOT`, or the short fallback with `PORTABLE_SHORT_ROOT`.
 - If the current directory path is already too long, it will automatically switch to `%USERPROFILE%\<base directory name>\.portable`.
 - Only directories for enabled tools are created under `.portable\lib`.
 
@@ -173,6 +175,30 @@ launch-vscode.bat cursor
 
 - To use system tools:
   - Set `set USE_SYSTEM_EXE=1` to use already installed tools that are in the PATH.
+
+## Instructions for AI When Creating AGENTS.md
+
+Add these rules to `AGENTS.md` in projects that use `portable-cmd.bat`:
+
+```bat
+cmd /c "cd /d <project-root> && call .\portable-cmd.bat && <command>"
+```
+
+- Do not edit `portable-cmd.bat`; it is an upstream file from [issixx/portable-cmd](https://github.com/issixx/portable-cmd).
+- Normally run each project command after `call .\portable-cmd.bat`. Do not use an absolute launcher path.
+- Use a wrapper `.bat` for multiple commands. Set options before `call`, for example `set "ENABLE_NODEJS=1"`.
+- Use the tools under `<portable-root>\lib`, including its `uv`. `<portable-root>` is `<project-root>\.portable` by default but may be relocated; use system versions only when `USE_SYSTEM_EXE=1` is explicitly set.
+- Manage dependencies with `uv add`, `uv remove`, and `uv sync`. Never use `pip`, `uv pip`, or edit uv-managed files manually.
+- Delete a broken `.venv` and rerun the launcher to rebuild it.
+- Keep project paths short. Avoid interactive commands and run servers in the background.
+- In PowerShell 5.1, run command chains through `cmd /c`.
+
+For one-off commands that do not need the activated environment, direct invocation is allowed:
+
+```bat
+<project-root>\.venv\Scripts\python.exe script.py
+<portable-root>\lib\uv\uv.exe run --directory <project-root> python script.py
+```
 
 ## License
 
