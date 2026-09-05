@@ -8,7 +8,7 @@ This allows you to start a command prompt for a specific environment just by run
 By default, **Git** and **uv** are enabled. Python is managed by uv (`uv add` with `pyproject.toml`). Do not use `pip`. Running `portable-cmd.bat` calls `uv sync`.
 
 
-## How to Run
+## How to Launch
 
 Execute
 ```bash
