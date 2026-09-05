@@ -11,12 +11,12 @@ By default, **Git** and **uv** are enabled. Python is managed by uv (`uv add` wi
 ## How to Launch
 
 Execute
-```bash
+```bat
 portable-cmd.bat
 ```
 or Download & Execute
-```bash
-powershell -NoProfile -Command "$f='portable-cmd.bat'; (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/issixx/portable-cmd/main/portable-cmd.bat') -replace \"`r?`n\",\"`r`n\" | Set-Content $f -Encoding ASCII; cmd /k $f"
+```bat
+curl -L -o portable-cmd.bat https://raw.githubusercontent.com/issixx/portable-cmd/main/portable-cmd.bat && cmd /k portable-cmd.bat
 ```
 
 After execution, the paths for the installed portable versions will be configured. If uv is enabled, `uv sync` is also run.
@@ -45,7 +45,10 @@ Optional:
 - **CUDA Toolkit** (`ENABLE_CUDA=1`): Downloads installer and installs after user confirmation (interactive)
 - **Vulkan SDK** (`ENABLE_VULKAN=1`): Downloads installer and installs after user confirmation (interactive)
 
-## Directory Structure (Auto-created on execution)
+## Directory Structure
+
+Only directories for enabled tools are created. Git and uv are shown below because they are enabled by default; other optional tools are omitted.
+
 ```
 <root>
 │
@@ -53,18 +56,7 @@ Optional:
 │   └─ lib            ← Portable binaries for each tool are stored here
 │       ├─ git
 │       ├─ uv
-│       ├─ cmake
-│       ├─ chrome
-│       ├─ chrome_driver
-│       ├─ ffmpeg
-│       ├─ nodejs
-│       ├─ go
-│       ├─ bun
-│       ├─ svn
-│       ├─ grafana
-│       ├─ loki
-│       ├─ prometheus
-│       └─ alloy
+│       └─ ...         ← Other enabled tools
 ├─ .venv              ← Created by uv
 ├─ pyproject.toml     ← Created by uv if missing
 ├─ .python-version    ← Pinned by uv
@@ -72,7 +64,6 @@ Optional:
 ```
 - `.portable` is created under the execution directory (`%~dp0`). Override the directory name with `PORTABLE_NAME`, the full path with `PORTABLE_ROOT`, or the short fallback with `PORTABLE_SHORT_ROOT`.
 - If the current directory path is already too long, it will automatically switch to `%USERPROFILE%\<base directory name>\.portable`.
-- Only directories for enabled tools are created under `.portable\lib`.
 
 ## Installation Tool Configuration
 
@@ -80,7 +71,7 @@ Optional:
 - To install other tools, either modify the settings directly or create a wrapper batch file like the following.
 
 my-portable-cmd.bat
-```bash
+```bat
 :: portable tools
 set ENABLE_GIT=1
 set ENABLE_UV=1
@@ -100,30 +91,12 @@ set ENABLE_CUDA=1
 set ENABLE_VULKAN=1
 
 :: launch portable-cmd
-call "%~dp0portable-cmd.bat"
-if ERRORLEVEL 1 goto :ERROR
-
-:: Switch to interactive mode if the script is called directly
-:: (Check if this batch filename is included in the startup command)
-echo %CMDCMDLINE:"=% | find /I "%~f0"
-if not ERRORLEVEL 1 (
-    cmd /K
-)
-
-:SUCCESS
-exit /b 0
-
-:ERROR
-	echo #############
-	echo #  !error!  #
-	echo #############
-	pause
-exit /b 1
+call "%~dp0portable-cmd.bat" "%~f0"
 ```
 
 - You can also change the binaries to be installed.
 
-```bash
+```bat
 set PORTABLE_GIT_URL=https://github.com/git-for-windows/git/releases/download/v2.47.0.windows.2/PortableGit-2.47.0.2-64-bit.7z.exe
 set PORTABLE_CMAKE_URL=https://github.com/Kitware/CMake/releases/download/v3.28.6/cmake-3.28.6-windows-x86_64.zip
 set PORTABLE_UV_URL=https://github.com/astral-sh/uv/releases/download/0.10.7/uv-x86_64-pc-windows-msvc.zip
@@ -148,25 +121,25 @@ set VULKAN_URL=https://sdk.lunarg.com/sdk/download/1.3.296.0/windows/VulkanSDK-1
 - Tool paths are only valid for processes launched from that batch file.
 - For example, if you want to launch VS Code with the auto-installed Python available, launch VS Code from within portable-cmd like this:
 
-```bash
+```bat
 portable-cmd.bat
 code .\
 ```
 
 `launch-vscode.bat` does the same in one step.
 
-```bash
+```bat
 launch-vscode.bat
 ```
 
 or Download & Execute
-```bash
-powershell -NoProfile -Command "$f='launch-vscode.bat'; (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/issixx/portable-cmd/main/launch-vscode.bat') -replace \"`r?`n\",\"`r`n\" | Set-Content $f -Encoding ASCII; cmd /c $f"
+```bat
+curl -L -o launch-vscode.bat https://raw.githubusercontent.com/issixx/portable-cmd/main/launch-vscode.bat && cmd /c launch-vscode.bat
 ```
 
 - To launch Cursor instead, pass `cursor` as the first argument:
 
-```bash
+```bat
 launch-vscode.bat cursor
 ```
 

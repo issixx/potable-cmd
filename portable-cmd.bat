@@ -1,6 +1,10 @@
 :: Copyright 2025 issixx. All Rights Reserved.
 :: Licensed under the MIT License.
 :: Repository: https://github.com/issixx/portable-cmd
+::
+:: This file must use CRLF line endings. cmd.exe misparses LF-only copies
+:: (for example, install branches may be skipped). The repository stores
+:: *.bat as CRLF via .gitattributes (`*.bat -text`).
 
 @echo off
 
@@ -119,6 +123,11 @@ if "%CUR_DIR_LEN_MAX%" equ "" set CUR_DIR_LEN_MAX=100
 :: Set to 1 to use pre-installed exe
 if "%USE_SYSTEM_EXE%" equ "" set USE_SYSTEM_EXE=0
 
+:: Launch mode:
+::   If CMDCMDLINE contains `&` (for example `&&` chains), return to the caller.
+::   PORTABLE_CMD_NONINTERACTIVE=1 also forces that, even without `&`.
+::   PORTABLE_CMD_SILENT=1 hides the success banner and per-tool check lines.
+
 :: Use venv if system exe is used
 if "%USE_SYSTEM_EXE%" equ "1" (
     set ENABLE_PYTHON_VENV=1
@@ -230,7 +239,9 @@ goto :SUCCESS
     echo #################################
     echo #   portable-cmd launch error   #
     echo #################################
-    pause
+    :: Chained or explicit automation must not block on pause.
+    call :SHOULD_RETURN_TO_CALLER
+    if ERRORLEVEL 1 pause
 exit /b 1
 
 :SUCCESS
@@ -240,18 +251,61 @@ exit /b 1
         echo ###################################
         echo.
     )
-    
-    :: Switch to interactive mode if the script is called directly
-    :: (Check if this batch filename is included in the startup command)
-    echo %CMDCMDLINE:"=% | find /I "%~f0" >nul
-    if not ERRORLEVEL 1 (
-        cmd /K
+
+    :: `&&` chains and explicit automation return. Double-click opens cmd /K.
+    :: Optional first argument is the caller's `%~f0` so a wrapper can omit
+    :: its own prompt check.
+    call :SHOULD_RETURN_TO_CALLER
+    if not ERRORLEVEL 1 exit /b 0
+    call :DETECT_DIRECT_LAUNCH "%~f0"
+    if not ERRORLEVEL 1 goto :KEEP_PROMPT
+    if "%~1" neq "" (
+        call :DETECT_DIRECT_LAUNCH "%~1"
+        if not ERRORLEVEL 1 goto :KEEP_PROMPT
     )
+exit /b 0
+
+:KEEP_PROMPT
+    cmd /K
 exit /b 0
 
 ::###################################################################################
 :: utility function
 ::###################################################################################
+
+:: Return 0 when this run should not open a prompt or pause.
+:SHOULD_RETURN_TO_CALLER
+    if "%PORTABLE_CMD_NONINTERACTIVE%" equ "1" exit /b 0
+    call :DETECT_CHAINED_COMMAND
+    if not ERRORLEVEL 1 exit /b 0
+exit /b 1
+
+:: Return 0 when CMDCMDLINE contains `&` (`&&`, `&`).
+:DETECT_CHAINED_COMMAND
+    :: Delayed expansion keeps `&` as data. Percent expansion would run it.
+    setlocal EnableDelayedExpansion
+    set "commandLine=!CMDCMDLINE!"
+    set "exitCode=1"
+    if defined commandLine (
+        if not "!commandLine:&=!"=="!commandLine!" set "exitCode=0"
+    )
+    endlocal & exit /b %exitCode%
+
+:: Return 0 when %1 appears in CMDCMDLINE (Explorer double-click or
+:: `cmd /c <that-file>`). Return 1 when it was only `call`ed.
+:DETECT_DIRECT_LAUNCH
+    :: Delayed expansion keeps `&` and `|` in CMDCMDLINE as data.
+    :: Do not pipe to find/findstr: `\` in the path is not a safe literal.
+    :: Delete the given path from a copy. If the copy stays the same,
+    :: that file is not the process entry.
+    setlocal EnableDelayedExpansion
+    set "commandLine=!CMDCMDLINE!"
+    set "entryPath=%~1"
+    set "exitCode=1"
+    if defined commandLine if defined entryPath (
+        if not "!commandLine:%entryPath%=!"=="!commandLine!" set "exitCode=0"
+    )
+    endlocal & exit /b %exitCode%
 
 :: Find the exe and display the version
 :WHERE_EXE

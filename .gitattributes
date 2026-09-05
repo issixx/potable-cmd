@@ -1,0 +1,4 @@
+# cmd.exe misparses LF-only .bat files (install branches may be skipped).
+# GitHub raw serves the blob as-is, so keep CRLF in the repository object.
+# `-text` disables LF normalization on add/checkout.
+*.bat -text

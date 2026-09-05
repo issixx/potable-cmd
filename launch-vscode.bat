@@ -1,6 +1,7 @@
 :: Copyright 2025 issixx. All Rights Reserved.
 :: Licensed under the MIT License.
 :: Repository: https://github.com/issixx/portable-cmd
+:: This file must use CRLF line endings. See .gitattributes (`*.bat -text`).
 ::
 :: Usage:
 ::   launch-vscode.bat           Launch VS Code with the portable environment
