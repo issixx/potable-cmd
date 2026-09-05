@@ -151,6 +151,23 @@ portable-cmd.bat
 code .\
 ```
 
+`launch-vscode.bat` does the same in one step.
+
+```bash
+launch-vscode.bat
+```
+
+or Download & Execute
+```bash
+powershell -NoProfile -Command "$f='launch-vscode.bat'; (New-Object Net.WebClient).DownloadString('https://raw.githubusercontent.com/issixx/portable-cmd/main/launch-vscode.bat') -replace \"`r?`n\",\"`r`n\" | Set-Content $f -Encoding ASCII; cmd /c $f"
+```
+
+- To launch Cursor instead, pass `cursor` as the first argument:
+
+```bash
+launch-vscode.bat cursor
+```
+
 - Python is managed by uv. Add packages with `uv add <package>`. Do not use `pip`.
 - Running `portable-cmd.bat` calls `uv sync` and activates `.venv`.
 
